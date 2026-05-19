@@ -53,6 +53,14 @@ function sanitizePayload(body, config, isCreate) {
   for (const field of config.fields || []) {
     if (source[field] !== undefined) {
       payload[field] = source[field];
+      continue;
+    }
+
+    for (const alias of config.aliases?.[field] || []) {
+      if (source[alias] !== undefined) {
+        payload[field] = source[alias];
+        break;
+      }
     }
   }
 

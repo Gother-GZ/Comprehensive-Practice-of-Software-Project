@@ -6,7 +6,11 @@ const dataDir = path.join(__dirname, '..', 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 
 const dbFile = process.env.DB_FILE || path.join(dataDir, 'adsb-interface.db');
-const schemaFile = path.join(__dirname, 'schema.sql');
+const schemaFile =
+  process.env.DB_SCHEMA_FILE ||
+  (fs.existsSync(path.join(__dirname, '..', 'Alpha', 'db', 'schema_v1.sql'))
+    ? path.join(__dirname, '..', 'Alpha', 'db', 'schema_v1.sql')
+    : path.join(__dirname, 'schema.sql'));
 
 const db = new Database(dbFile);
 db.pragma('journal_mode = WAL');

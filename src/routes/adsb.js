@@ -33,6 +33,67 @@ function parseOptionalNumber(value) {
   return parsed;
 }
 
+function parseTrackLocation(location) {
+  if (!location) {
+    return {};
+  }
+
+  const value = String(location).trim();
+  const pointMatch = value.match(/^POINT\s*\(\s*([-+]?\d+(?:\.\d+)?)\s+([-+]?\d+(?:\.\d+)?)\s*\)$/i);
+  if (pointMatch) {
+    return {
+      longitude: Number(pointMatch[1]),
+      latitude: Number(pointMatch[2]),
+    };
+  }
+
+  const commaMatch = value.match(/^\s*([-+]?\d+(?:\.\d+)?)\s*,\s*([-+]?\d+(?:\.\d+)?)\s*$/);
+  if (commaMatch) {
+    return {
+      latitude: Number(commaMatch[1]),
+      longitude: Number(commaMatch[2]),
+    };
+  }
+
+  return {};
+}
+
+function withTrackCoordinates(track) {
+  if (!track) {
+    return track;
+  }
+
+  return {
+    ...track,
+    ...parseTrackLocation(track.location),
+  };
+}
+
+function isWithinBounds(track, bounds) {
+  const { latitude, longitude } = withTrackCoordinates(track);
+
+  if (
+    (bounds.minLatitude !== undefined || bounds.maxLatitude !== undefined) &&
+    latitude === undefined
+  ) {
+    return false;
+  }
+
+  if (
+    (bounds.minLongitude !== undefined || bounds.maxLongitude !== undefined) &&
+    longitude === undefined
+  ) {
+    return false;
+  }
+
+  return (
+    (bounds.minLatitude === undefined || latitude >= bounds.minLatitude) &&
+    (bounds.maxLatitude === undefined || latitude <= bounds.maxLatitude) &&
+    (bounds.minLongitude === undefined || longitude >= bounds.minLongitude) &&
+    (bounds.maxLongitude === undefined || longitude <= bounds.maxLongitude)
+  );
+}
+
 router.post('/tracks', (req, res, next) => {
   try {
     const data = upsertTrack(req.body, 'api:track');
@@ -104,22 +165,18 @@ router.get('/tracks', (req, res, next) => {
     const maxAltitude = parseOptionalNumber(req.query.max_altitude);
 
     if (minLatitude !== undefined) {
-      clauses.push('latitude >= @min_latitude');
       params.min_latitude = minLatitude;
     }
 
     if (maxLatitude !== undefined) {
-      clauses.push('latitude <= @max_latitude');
       params.max_latitude = maxLatitude;
     }
 
     if (minLongitude !== undefined) {
-      clauses.push('longitude >= @min_longitude');
       params.min_longitude = minLongitude;
     }
 
     if (maxLongitude !== undefined) {
-      clauses.push('longitude <= @max_longitude');
       params.max_longitude = maxLongitude;
     }
 
@@ -142,7 +199,17 @@ router.get('/tracks', (req, res, next) => {
       LIMIT ${limit}
     `;
 
-    const data = db.prepare(sql).all(params);
+    const rows = db.prepare(sql).all(params);
+    const data = rows
+      .filter((track) =>
+        isWithinBounds(track, {
+          minLatitude,
+          maxLatitude,
+          minLongitude,
+          maxLongitude,
+        }),
+      )
+      .map(withTrackCoordinates);
     res.json({ data, count: data.length });
   } catch (error) {
     next(error);
@@ -159,7 +226,7 @@ router.get('/tracks/:trackId', (req, res, next) => {
       return res.status(404).json({ error: 'Track not found.' });
     }
 
-    return res.json({ data });
+    return res.json({ data: withTrackCoordinates(data) });
   } catch (error) {
     return next(error);
   }
@@ -198,8 +265,7 @@ router.get('/fusion/voice-track', (req, res, next) => {
         v.file_name,
         t.track_id,
         t.callsign,
-        t.latitude,
-        t.longitude,
+        t.location,
         t.altitude,
         t.ground_speed,
         t.heading,
@@ -216,7 +282,10 @@ router.get('/fusion/voice-track', (req, res, next) => {
       LIMIT ${limit}
     `;
 
-    const data = db.prepare(sql).all(params);
+    const data = db.prepare(sql).all(params).map((row) => ({
+      ...row,
+      ...parseTrackLocation(row.location),
+    }));
     res.json({ data, count: data.length });
   } catch (error) {
     next(error);

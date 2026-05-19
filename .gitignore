@@ -4,3 +4,19 @@ data/
 *.db-shm
 *.db-wal
 *.log
+
+# Python backend runtime artifacts
+.venv/
+__pycache__/
+*.py[cod]
+
+# Backend generated data and local outputs
+Alpha/.env
+Alpha/.venv/
+Alpha/data/
+Alpha/tmp/
+Alpha/**/__pycache__/
+Alpha/**/*.py[cod]
+Alpha/*.csv
+Alpha/*.jsonl
+Alpha/openapi.json

@@ -18,6 +18,16 @@ function parseNumber(value, field, integer = false, nullable = true) {
   return integer ? Math.trunc(parsed) : parsed;
 }
 
+function normalizeLocation(input) {
+  if (input.location !== undefined && input.location !== null && input.location !== '') {
+    return String(input.location);
+  }
+
+  const latitude = parseNumber(input.latitude ?? input.lat, 'latitude', false, false);
+  const longitude = parseNumber(input.longitude ?? input.lng, 'longitude', false, false);
+  return `POINT(${longitude} ${latitude})`;
+}
+
 function normalizeTrack(input, fallbackSource) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Track payload must be an object.');
@@ -26,19 +36,11 @@ function normalizeTrack(input, fallbackSource) {
   return {
     track_id: input.track_id || randomUUID(),
     callsign: input.callsign || null,
-    latitude: parseNumber(input.latitude, 'latitude', false, false),
-    longitude: parseNumber(input.longitude, 'longitude', false, false),
+    location: normalizeLocation(input),
     altitude: parseNumber(input.altitude, 'altitude', true, true),
     ground_speed: parseNumber(input.ground_speed, 'ground_speed', true, true),
     heading: parseNumber(input.heading, 'heading', true, true),
     timestamp: input.timestamp || new Date().toISOString(),
-    source: input.source || fallbackSource || null,
-    raw_payload:
-      input.raw_payload === undefined || input.raw_payload === null
-        ? null
-        : typeof input.raw_payload === 'string'
-          ? input.raw_payload
-          : JSON.stringify(input.raw_payload),
   };
 }
 
@@ -46,36 +48,27 @@ const upsertTrackStatement = db.prepare(`
   INSERT INTO adsb_tracks (
     track_id,
     callsign,
-    latitude,
-    longitude,
+    location,
     altitude,
     ground_speed,
     heading,
-    timestamp,
-    source,
-    raw_payload
+    timestamp
   ) VALUES (
     @track_id,
     @callsign,
-    @latitude,
-    @longitude,
+    @location,
     @altitude,
     @ground_speed,
     @heading,
-    @timestamp,
-    @source,
-    @raw_payload
+    @timestamp
   )
   ON CONFLICT(track_id) DO UPDATE SET
     callsign = excluded.callsign,
-    latitude = excluded.latitude,
-    longitude = excluded.longitude,
+    location = excluded.location,
     altitude = excluded.altitude,
     ground_speed = excluded.ground_speed,
     heading = excluded.heading,
-    timestamp = excluded.timestamp,
-    source = excluded.source,
-    raw_payload = excluded.raw_payload
+    timestamp = excluded.timestamp
 `);
 
 const batchUpsertTransaction = db.transaction((items, fallbackSource) =>
