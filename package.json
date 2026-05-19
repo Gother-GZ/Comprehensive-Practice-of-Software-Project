@@ -1,0 +1,16 @@
+{
+  "name": "ads-b-interface",
+  "version": "1.0.0",
+  "description": "ADS-B and voice-track integration prototype API",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/db.js && node --check src/routes/crud.js && node --check src/routes/adsb.js && node --check src/services/trackService.js && node --check src/services/realtimeCollector.js",
+    "smoke": "node scripts/smoke-test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
