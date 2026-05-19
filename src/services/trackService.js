@@ -23,6 +23,7 @@ function normalizeLocation(input) {
     return String(input.location);
   }
 
+  // Accept frontend-friendly latitude/longitude fields and store them as POINT(lng lat).
   const latitude = parseNumber(input.latitude ?? input.lat, 'latitude', false, false);
   const longitude = parseNumber(input.longitude ?? input.lng, 'longitude', false, false);
   return `POINT(${longitude} ${latitude})`;

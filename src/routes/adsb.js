@@ -39,6 +39,7 @@ function parseTrackLocation(location) {
   }
 
   const value = String(location).trim();
+  // Alpha database stores ADS-B coordinates in a single POINT(lng lat) column.
   const pointMatch = value.match(/^POINT\s*\(\s*([-+]?\d+(?:\.\d+)?)\s+([-+]?\d+(?:\.\d+)?)\s*\)$/i);
   if (pointMatch) {
     return {
@@ -47,6 +48,7 @@ function parseTrackLocation(location) {
     };
   }
 
+  // Keep a fallback for older/demo data that may have been stored as "lat,lng".
   const commaMatch = value.match(/^\s*([-+]?\d+(?:\.\d+)?)\s*,\s*([-+]?\d+(?:\.\d+)?)\s*$/);
   if (commaMatch) {
     return {
@@ -63,6 +65,7 @@ function withTrackCoordinates(track) {
     return track;
   }
 
+  // Expose latitude/longitude to API callers while preserving the DB location field.
   return {
     ...track,
     ...parseTrackLocation(track.location),
@@ -72,6 +75,7 @@ function withTrackCoordinates(track) {
 function isWithinBounds(track, bounds) {
   const { latitude, longitude } = withTrackCoordinates(track);
 
+  // SQLite has no spatial POINT comparison here, so coordinate bounds are applied in JS.
   if (
     (bounds.minLatitude !== undefined || bounds.maxLatitude !== undefined) &&
     latitude === undefined
@@ -164,6 +168,7 @@ router.get('/tracks', (req, res, next) => {
     const minAltitude = parseOptionalNumber(req.query.min_altitude);
     const maxAltitude = parseOptionalNumber(req.query.max_altitude);
 
+    // Latitude/longitude are parsed from location after the SQL query.
     if (minLatitude !== undefined) {
       params.min_latitude = minLatitude;
     }
