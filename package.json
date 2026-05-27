@@ -17,6 +17,11 @@
   "type": "commonjs",
   "dependencies": {
     "better-sqlite3": "^12.10.0",
+<<<<<<< HEAD
     "express": "^5.2.1"
+=======
+    "express": "^5.2.1",
+    "sqlite3": "^6.0.1"
+>>>>>>> 724af0d7c27039502437ecd512dc6f0bd934b1b7
   }
 }
