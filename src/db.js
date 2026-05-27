@@ -17,6 +17,25 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 db.exec(fs.readFileSync(schemaFile, 'utf8'));
 
+function ensureColumns(table, columns) {
+  const existing = new Set(
+    db.prepare(`PRAGMA table_info(${table})`)
+      .all()
+      .map((column) => column.name),
+  );
+
+  for (const [name, definition] of Object.entries(columns)) {
+    if (!existing.has(name)) {
+      db.prepare(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`).run();
+    }
+  }
+}
+
+ensureColumns('adsb_tracks', {
+  source: 'TEXT',
+  raw_payload: 'TEXT',
+});
+
 function omitUndefined(source = {}) {
   return Object.fromEntries(
     Object.entries(source).filter(([, value]) => value !== undefined),

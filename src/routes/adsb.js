@@ -2,6 +2,18 @@ const express = require('express');
 const { db } = require('../db');
 const { upsertTrack, batchUpsertTracks } = require('../services/trackService');
 const {
+  BOUNDING_BOX_PRESETS,
+  fetchAndStoreOpenSkyStates,
+  normalizeBounds,
+  normalizeLimit,
+} = require('../services/openSkyCollector');
+const {
+  POINT_PRESETS,
+  fetchAndStoreAirplanesLiveAircraft,
+  normalizePoint,
+  normalizeLimit: normalizeAirplanesLimit,
+} = require('../services/airplanesLiveCollector');
+const {
   startRealtimeTask,
   stopRealtimeTask,
   getRealtimeTaskStatus,
@@ -31,6 +43,64 @@ function parseOptionalNumber(value) {
   }
 
   return parsed;
+}
+
+function firstDefined(...values) {
+  return values.find((value) => value !== undefined && value !== null && value !== '');
+}
+
+function parseBoolean(value) {
+  if (value === undefined || value === null || value === '') {
+    return false;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+}
+
+function parseOpenSkyFetchOptions(req) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const query = req.query || {};
+  const boundsSource = body.bounds || {
+    lamin: firstDefined(body.lamin, body.min_latitude, body.minLatitude, query.lamin, query.min_latitude, query.minLatitude),
+    lomin: firstDefined(body.lomin, body.min_longitude, body.minLongitude, query.lomin, query.min_longitude, query.minLongitude),
+    lamax: firstDefined(body.lamax, body.max_latitude, body.maxLatitude, query.lamax, query.max_latitude, query.maxLatitude),
+    lomax: firstDefined(body.lomax, body.max_longitude, body.maxLongitude, query.lomax, query.max_longitude, query.maxLongitude),
+  };
+  const hasBounds = Object.values(boundsSource).some(
+    (value) => value !== undefined && value !== null && value !== '',
+  );
+
+  return {
+    preset: firstDefined(body.preset, query.preset),
+    bounds: hasBounds ? normalizeBounds(boundsSource) : undefined,
+    limit: normalizeLimit(firstDefined(body.limit, query.limit), 100),
+    icao24: firstDefined(body.icao24, query.icao24),
+    time: firstDefined(body.time, query.time),
+    extended: parseBoolean(firstDefined(body.extended, query.extended)),
+  };
+}
+
+function parseAirplanesLiveFetchOptions(req) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const query = req.query || {};
+  const pointSource = body.point || {
+    lat: firstDefined(body.lat, body.latitude, query.lat, query.latitude),
+    lon: firstDefined(body.lon, body.lng, body.longitude, query.lon, query.lng, query.longitude),
+    radius: firstDefined(body.radius, body.radius_nm, query.radius, query.radius_nm),
+  };
+  const hasPoint = Object.values(pointSource).some(
+    (value) => value !== undefined && value !== null && value !== '',
+  );
+
+  return {
+    preset: firstDefined(body.preset, query.preset),
+    point: hasPoint ? normalizePoint(pointSource) : undefined,
+    limit: normalizeAirplanesLimit(firstDefined(body.limit, query.limit), 100),
+  };
 }
 
 function parseTrackLocation(location) {
@@ -134,6 +204,69 @@ router.post('/ingest', (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+router.post('/sources/opensky/fetch', async (req, res, next) => {
+  try {
+    const options = parseOpenSkyFetchOptions(req);
+    const result = await fetchAndStoreOpenSkyStates(options);
+    res.status(201).json({
+      data: {
+        provider: result.provider,
+        endpoint: result.endpoint,
+        request_url: result.request_url,
+        bounds: result.bounds,
+        response_time: result.response_time,
+        response_time_iso: result.response_time_iso,
+        fetched_count: result.fetched_count,
+        decoded_count: result.decoded_count,
+        skipped_count: result.skipped_count,
+        limited_count: result.limited_count,
+        saved_count: result.saved_count,
+        rate_limit: result.rate_limit,
+        sample: result.saved.slice(0, 5).map(({ raw_payload, ...track }) => track),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/sources/opensky/presets', (req, res) => {
+  res.json({
+    data: BOUNDING_BOX_PRESETS,
+  });
+});
+
+router.post('/sources/airplanes-live/fetch', async (req, res, next) => {
+  try {
+    const options = parseAirplanesLiveFetchOptions(req);
+    const result = await fetchAndStoreAirplanesLiveAircraft(options);
+    res.status(201).json({
+      data: {
+        provider: result.provider,
+        endpoint: result.endpoint,
+        request_url: result.request_url,
+        point: result.point,
+        response_time_ms: result.response_time_ms,
+        response_time_iso: result.response_time_iso,
+        fetched_count: result.fetched_count,
+        decoded_count: result.decoded_count,
+        skipped_count: result.skipped_count,
+        limited_count: result.limited_count,
+        saved_count: result.saved_count,
+        sample: result.saved.slice(0, 5).map(({ raw_payload, ...track }) => track),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/sources/airplanes-live/presets', (req, res) => {
+  res.json({
+    data: POINT_PRESETS,
+  });
 });
 
 router.get('/tracks', (req, res, next) => {

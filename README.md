@@ -98,6 +98,43 @@ curl -X POST http://localhost:3000/api/adsb/realtime-tasks/1/start
 {"track_id":"t-2","callsign":"CES456","latitude":31.23,"longitude":121.47,"altitude":11200,"timestamp":"2026-04-06T12:00:05Z"}
 ```
 
+### 9. Fetch real OpenSky ADS-B states
+
+OpenSky `/states/all` returns decoded state vectors, so this prototype decodes the vector fields,
+converts altitude from meters to feet, converts velocity from m/s to knots, stores coordinates as
+`POINT(lng lat)`, and keeps the raw vector in `raw_payload`.
+
+```bash
+npm run fetch:opensky -- --preset switzerland --limit 20
+```
+
+Or call it through the API:
+
+```bash
+curl -X POST http://localhost:3000/api/adsb/sources/opensky/fetch ^
+  -H "Content-Type: application/json" ^
+  -d "{\"preset\":\"switzerland\",\"limit\":20}"
+```
+
+Built-in presets: `hongkong`, `beijing`, `switzerland`, `global`.
+Optional authentication uses `OPENSKY_CLIENT_ID` and `OPENSKY_CLIENT_SECRET`.
+
+If OpenSky anonymous credits are exhausted, use Airplanes.live:
+
+```bash
+npm run fetch:airplanes -- --preset switzerland --limit 20
+```
+
+Or call it through the API:
+
+```bash
+curl -X POST http://localhost:3000/api/adsb/sources/airplanes-live/fetch ^
+  -H "Content-Type: application/json" ^
+  -d "{\"preset\":\"switzerland\",\"limit\":20}"
+```
+
+Airplanes.live data is already decoded JSON; altitude is kept in feet and ground speed in knots.
+
 ## 目录结构
 
 ```text
@@ -109,6 +146,8 @@ src/
     adsb.js
     crud.js
   services/
+    airplanesLiveCollector.js
+    openSkyCollector.js
     realtimeCollector.js
     trackService.js
 ```

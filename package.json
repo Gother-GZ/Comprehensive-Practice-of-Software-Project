@@ -6,11 +6,17 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/db.js && node --check src/routes/crud.js && node --check src/routes/adsb.js && node --check src/services/trackService.js && node --check src/services/realtimeCollector.js",
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/db.js && node --check src/routes/crud.js && node --check src/routes/adsb.js && node --check src/services/trackService.js && node --check src/services/realtimeCollector.js && node --check src/services/openSkyCollector.js && node --check src/services/airplanesLiveCollector.js && node --check scripts/fetch-opensky.js && node --check scripts/fetch-airplanes-live.js",
+    "fetch:opensky": "node scripts/fetch-opensky.js",
+    "fetch:airplanes": "node scripts/fetch-airplanes-live.js",
     "smoke": "node scripts/smoke-test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "commonjs",
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "express": "^5.2.1"
+  }
 }
