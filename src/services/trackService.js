@@ -18,17 +18,6 @@ function parseNumber(value, field, integer = false, nullable = true) {
   return integer ? Math.trunc(parsed) : parsed;
 }
 
-function normalizeLocation(input) {
-  if (input.location !== undefined && input.location !== null && input.location !== '') {
-    return String(input.location);
-  }
-
-  // Accept frontend-friendly latitude/longitude fields and store them as POINT(lng lat).
-  const latitude = parseNumber(input.latitude ?? input.lat, 'latitude', false, false);
-  const longitude = parseNumber(input.longitude ?? input.lng, 'longitude', false, false);
-  return `POINT(${longitude} ${latitude})`;
-}
-
 function normalizeTrack(input, fallbackSource) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Track payload must be an object.');
@@ -37,7 +26,8 @@ function normalizeTrack(input, fallbackSource) {
   return {
     track_id: input.track_id || randomUUID(),
     callsign: input.callsign || null,
-    location: normalizeLocation(input),
+    latitude: parseNumber(input.latitude ?? input.lat, 'latitude', false, false),
+    longitude: parseNumber(input.longitude ?? input.lng, 'longitude', false, false),
     altitude: parseNumber(input.altitude, 'altitude', true, true),
     ground_speed: parseNumber(input.ground_speed, 'ground_speed', true, true),
     heading: parseNumber(input.heading, 'heading', true, true),
@@ -49,7 +39,8 @@ const upsertTrackStatement = db.prepare(`
   INSERT INTO adsb_tracks (
     track_id,
     callsign,
-    location,
+    latitude,
+    longitude,
     altitude,
     ground_speed,
     heading,
@@ -57,7 +48,8 @@ const upsertTrackStatement = db.prepare(`
   ) VALUES (
     @track_id,
     @callsign,
-    @location,
+    @latitude,
+    @longitude,
     @altitude,
     @ground_speed,
     @heading,
@@ -65,7 +57,8 @@ const upsertTrackStatement = db.prepare(`
   )
   ON CONFLICT(track_id) DO UPDATE SET
     callsign = excluded.callsign,
-    location = excluded.location,
+    latitude = excluded.latitude,
+    longitude = excluded.longitude,
     altitude = excluded.altitude,
     ground_speed = excluded.ground_speed,
     heading = excluded.heading,
