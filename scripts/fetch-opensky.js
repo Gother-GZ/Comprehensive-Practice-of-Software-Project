@@ -6,10 +6,12 @@ const {
 
 function parseArgs(argv) {
   const options = {};
+  const positional = [];
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (!arg.startsWith('--')) {
+      positional.push(arg);
       continue;
     }
 
@@ -23,6 +25,14 @@ function parseArgs(argv) {
           : true;
 
     options[key] = value;
+  }
+
+  if (!options.preset && positional[0]) {
+    options.preset = positional[0];
+  }
+
+  if (!options.limit && positional[1]) {
+    options.limit = positional[1];
   }
 
   return options;

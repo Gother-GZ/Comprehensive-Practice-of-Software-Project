@@ -17,6 +17,33 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 db.exec(fs.readFileSync(schemaFile, 'utf8'));
 
+db.exec(`
+CREATE TABLE IF NOT EXISTS adsb_routes (
+  route_id TEXT PRIMARY KEY,
+  route_key TEXT NOT NULL,
+  callsign TEXT,
+  aircraft_hex TEXT,
+  provider TEXT,
+  source TEXT,
+  start_time TEXT,
+  end_time TEXT,
+  point_count INTEGER DEFAULT 0,
+  min_latitude REAL,
+  min_longitude REAL,
+  max_latitude REAL,
+  max_longitude REAL,
+  path_geojson TEXT,
+  sample_track_ids TEXT,
+  raw_summary TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_adsb_routes_key ON adsb_routes(route_key);
+CREATE INDEX IF NOT EXISTS idx_adsb_routes_callsign ON adsb_routes(callsign);
+CREATE INDEX IF NOT EXISTS idx_adsb_routes_aircraft_hex ON adsb_routes(aircraft_hex);
+CREATE INDEX IF NOT EXISTS idx_adsb_routes_time ON adsb_routes(start_time, end_time);
+`);
+
 function ensureColumns(table, columns) {
   const existing = new Set(
     db.prepare(`PRAGMA table_info(${table})`)
@@ -34,6 +61,26 @@ function ensureColumns(table, columns) {
 ensureColumns('adsb_tracks', {
   source: 'TEXT',
   raw_payload: 'TEXT',
+});
+
+ensureColumns('adsb_routes', {
+  route_key: 'TEXT',
+  callsign: 'TEXT',
+  aircraft_hex: 'TEXT',
+  provider: 'TEXT',
+  source: 'TEXT',
+  start_time: 'TEXT',
+  end_time: 'TEXT',
+  point_count: 'INTEGER DEFAULT 0',
+  min_latitude: 'REAL',
+  min_longitude: 'REAL',
+  max_latitude: 'REAL',
+  max_longitude: 'REAL',
+  path_geojson: 'TEXT',
+  sample_track_ids: 'TEXT',
+  raw_summary: 'TEXT',
+  created_at: 'TEXT DEFAULT CURRENT_TIMESTAMP',
+  updated_at: 'TEXT DEFAULT CURRENT_TIMESTAMP',
 });
 
 function omitUndefined(source = {}) {

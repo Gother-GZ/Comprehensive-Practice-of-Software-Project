@@ -38,6 +38,31 @@ CREATE INDEX IF NOT EXISTS idx_adsb_callsign ON adsb_tracks(callsign);
 CREATE INDEX IF NOT EXISTS idx_adsb_lat_lon ON adsb_tracks(latitude, longitude);
 CREATE INDEX IF NOT EXISTS idx_adsb_timestamp ON adsb_tracks(timestamp);
 
+CREATE TABLE IF NOT EXISTS adsb_routes (
+    route_id TEXT PRIMARY KEY,
+    route_key TEXT NOT NULL,
+    callsign TEXT,
+    aircraft_hex TEXT,
+    provider TEXT,
+    source TEXT,
+    start_time TEXT,
+    end_time TEXT,
+    point_count INTEGER DEFAULT 0,
+    min_latitude REAL,
+    min_longitude REAL,
+    max_latitude REAL,
+    max_longitude REAL,
+    path_geojson TEXT,
+    sample_track_ids TEXT,
+    raw_summary TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_adsb_routes_key ON adsb_routes(route_key);
+CREATE INDEX IF NOT EXISTS idx_adsb_routes_callsign ON adsb_routes(callsign);
+CREATE INDEX IF NOT EXISTS idx_adsb_routes_aircraft_hex ON adsb_routes(aircraft_hex);
+CREATE INDEX IF NOT EXISTS idx_adsb_routes_time ON adsb_routes(start_time, end_time);
+
 -- 3. 语音与航迹关联表 (A-2 & A-1)
 CREATE TABLE IF NOT EXISTS a2_voice_track_rel (
     rel_id INTEGER PRIMARY KEY AUTOINCREMENT,

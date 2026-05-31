@@ -19,6 +19,16 @@ const {
   getRealtimeTaskStatus,
   listRealtimeTaskStatus,
 } = require('../services/realtimeCollector');
+const {
+  crawlRoutesOnce,
+  rebuildRoutesFromStoredTracks,
+  listRoutes,
+  getRoute,
+  startRouteCrawlTask,
+  stopRouteCrawlTask,
+  getRouteCrawlTaskStatus,
+  listRouteCrawlTaskStatus,
+} = require('../services/routeCrawlerService');
 
 const router = express.Router();
 
@@ -100,6 +110,64 @@ function parseAirplanesLiveFetchOptions(req) {
     preset: firstDefined(body.preset, query.preset),
     point: hasPoint ? normalizePoint(pointSource) : undefined,
     limit: normalizeAirplanesLimit(firstDefined(body.limit, query.limit), 100),
+  };
+}
+
+function parseRouteCrawlOptions(req) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const query = req.query || {};
+  const boundsSource = body.bounds || {
+    lamin: firstDefined(body.lamin, body.min_latitude, body.minLatitude, query.lamin, query.min_latitude, query.minLatitude),
+    lomin: firstDefined(body.lomin, body.min_longitude, body.minLongitude, query.lomin, query.min_longitude, query.minLongitude),
+    lamax: firstDefined(body.lamax, body.max_latitude, body.maxLatitude, query.lamax, query.max_latitude, query.maxLatitude),
+    lomax: firstDefined(body.lomax, body.max_longitude, body.maxLongitude, query.lomax, query.max_longitude, query.maxLongitude),
+  };
+  const pointSource = body.point || {
+    lat: firstDefined(body.lat, body.latitude, query.lat, query.latitude),
+    lon: firstDefined(body.lon, body.lng, body.longitude, query.lon, query.lng, query.longitude),
+    radius: firstDefined(body.radius, body.radius_nm, query.radius, query.radius_nm),
+  };
+  const hasBounds = Object.values(boundsSource).some(
+    (value) => value !== undefined && value !== null && value !== '',
+  );
+  const hasPoint = Object.values(pointSource).some(
+    (value) => value !== undefined && value !== null && value !== '',
+  );
+
+  return {
+    provider: firstDefined(body.provider, query.provider),
+    preset: firstDefined(body.preset, query.preset),
+    bounds: hasBounds ? normalizeBounds(boundsSource) : undefined,
+    point: hasPoint ? normalizePoint(pointSource) : undefined,
+    limit: firstDefined(body.limit, query.limit),
+    max_route_points: firstDefined(body.max_route_points, body.maxRoutePoints, query.max_route_points, query.maxRoutePoints),
+    icao24: firstDefined(body.icao24, query.icao24),
+    time: firstDefined(body.time, query.time),
+    extended: parseBoolean(firstDefined(body.extended, query.extended)),
+    merge_sources: parseBoolean(firstDefined(body.merge_sources, body.mergeSources, query.merge_sources, query.mergeSources)),
+    live_only: parseBoolean(firstDefined(body.live_only, body.liveOnly, query.live_only, query.liveOnly)),
+    fresh_only: parseBoolean(firstDefined(body.fresh_only, body.freshOnly, query.fresh_only, query.freshOnly)),
+    no_store: parseBoolean(firstDefined(body.no_store, body.noStore, query.no_store, query.noStore)),
+    interval_seconds: firstDefined(body.interval_seconds, body.intervalSeconds, query.interval_seconds, query.intervalSeconds),
+    task_id: firstDefined(body.task_id, body.taskId, query.task_id, query.taskId),
+  };
+}
+
+function parseRouteQueryOptions(req) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const query = req.query || {};
+
+  return {
+    route_id: firstDefined(body.route_id, body.routeId, query.route_id, query.routeId),
+    route_key: firstDefined(body.route_key, body.routeKey, query.route_key, query.routeKey),
+    callsign: firstDefined(body.callsign, query.callsign),
+    aircraft_hex: firstDefined(body.aircraft_hex, body.aircraftHex, query.aircraft_hex, query.aircraftHex),
+    provider: firstDefined(body.provider, query.provider),
+    source: firstDefined(body.source, query.source),
+    start_time: firstDefined(body.start_time, body.startTime, query.start_time, query.startTime),
+    end_time: firstDefined(body.end_time, body.endTime, query.end_time, query.endTime),
+    limit: firstDefined(body.limit, query.limit),
+    merge_sources: parseBoolean(firstDefined(body.merge_sources, body.mergeSources, query.merge_sources, query.mergeSources)),
   };
 }
 
@@ -267,6 +335,82 @@ router.get('/sources/airplanes-live/presets', (req, res) => {
   res.json({
     data: POINT_PRESETS,
   });
+});
+
+router.post('/routes/crawl', async (req, res, next) => {
+  try {
+    const data = await crawlRoutesOnce(parseRouteCrawlOptions(req));
+    res.status(201).json({ data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/routes/rebuild', (req, res, next) => {
+  try {
+    const data = rebuildRoutesFromStoredTracks(parseRouteQueryOptions(req));
+    res.status(201).json({ data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/routes', (req, res, next) => {
+  try {
+    const data = listRoutes(parseRouteQueryOptions(req));
+    res.json({ data, count: data.length });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/routes/:routeId', (req, res, next) => {
+  try {
+    const data = getRoute(req.params.routeId);
+    if (!data) {
+      return res.status(404).json({ error: 'Route not found.' });
+    }
+
+    return res.json({ data });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/routes/crawl-tasks/start', (req, res, next) => {
+  try {
+    const data = startRouteCrawlTask(parseRouteCrawlOptions(req));
+    res.status(202).json({ data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/routes/crawl-tasks/:taskId/stop', (req, res, next) => {
+  try {
+    const data = stopRouteCrawlTask(req.params.taskId);
+    if (!data) {
+      return res.status(404).json({ error: 'Route crawl task is not running.' });
+    }
+
+    return res.json({ data });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/routes/crawl-tasks/status', (req, res) => {
+  const data = listRouteCrawlTaskStatus();
+  res.json({ data, count: data.length });
+});
+
+router.get('/routes/crawl-tasks/:taskId/status', (req, res) => {
+  const data = getRouteCrawlTaskStatus(req.params.taskId);
+  if (!data) {
+    return res.status(404).json({ error: 'Route crawl task is not running.' });
+  }
+
+  return res.json({ data });
 });
 
 router.get('/tracks', (req, res, next) => {
